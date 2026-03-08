@@ -3,7 +3,7 @@ package service
 import (
 	"math"
 
-	"github.com/hellinvoid/network-programming/001-prime-time/dto"
+	"github.com/hellinvoid/network-programming/problems/001-prime-time/dto"
 )
 
 func IsPrime(req *dto.Request) dto.Response {
