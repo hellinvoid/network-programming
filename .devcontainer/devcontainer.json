@@ -1,5 +1,5 @@
 {
-	"name": "001-prime-time",
+	"name": "network-programming",
 	"image": "mcr.microsoft.com/devcontainers/go:2-1.25-trixie",
 	"features": {
 		"ghcr.io/devcontainers-extra/features/apt-packages:1": {}
