@@ -5,8 +5,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/hellinvoid/001-prime-time/dto"
-	"github.com/hellinvoid/001-prime-time/service"
+	"github.com/hellinvoid/network-programming/001-prime-time/dto"
+	"github.com/hellinvoid/network-programming/001-prime-time/service"
 )
 
 const (
