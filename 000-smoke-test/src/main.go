@@ -6,19 +6,19 @@ import (
 )
 
 const (
-	PROTOCOL    = "tcp"
-	ADDRESS     = ":6969"
+	PROTOCOL = "tcp"
+	ADDRESS  = ":6969"
 	// BUFFER_SIZE = 4096
 )
 
 func main() {
-	listner, err := net.Listen(PROTOCOL, ADDRESS)
+	listener, err := net.Listen(PROTOCOL, ADDRESS)
 	if err != nil {
 		panic(err)
 	}
 
 	for {
-		conn, err := listner.Accept()
+		conn, err := listener.Accept()
 		if err != nil {
 			panic(err)
 		}
