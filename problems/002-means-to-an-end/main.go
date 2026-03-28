@@ -52,7 +52,7 @@ func handleConn(conn net.Conn) {
 			continue
 		}
 		
-		err = dto.SendResponse(*res, conn)
+		err = service.SendResponse(*res, conn)
 		if err != nil {
 			return
 		}
