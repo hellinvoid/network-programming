@@ -7,7 +7,7 @@ import (
 	"io"
 	"net"
 
-	"github.com/hellinvoid/network-programming/problems/003-budget-chat/utils"
+	"github.com/hellinvoid/network-programming/common"
 )
 
 const (
@@ -39,7 +39,7 @@ func NewClient(conn net.Conn, cr ChatRoom) (*Client, error) {
 	username := string(usernameBytes)
 	
 	// Check for invalid username 
-	if len(username) > MAX_USERNAME_LENGTH || len(username) < 1 || !utils.IsAlnum(username) {
+	if len(username) > MAX_USERNAME_LENGTH || len(username) < 1 || !common.IsAlnum(username) {
 		return nil, errors.New("Username invalid")
 	}
 
