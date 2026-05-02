@@ -28,7 +28,6 @@ func (ts *TicketSystem) HandlePlate() {
 
 			for _, sp2 := range sps {
 				speed := getSpeed(sp, sp2)
-				log.Println(speed, speedLimit)
 
 				if speed >= float64(speedLimit)+0.5 {
 					// Issue a ticket
@@ -67,9 +66,10 @@ func (ts *TicketSystem) HandlePlate() {
 
 func sendTicket(ticket *Ticket, dispatchers chan net.Conn) {
 	conn := <-dispatchers
-	log.Println(conn.RemoteAddr())
+	log.Println("Conn at send: ",conn)
+
 	_, err := conn.Write(ticket.Encode())
-	log.Println(ticket.Encode())
+	log.Println("WRITTEN: ",ticket.Encode())
 	if err != nil {
 		conn.Close()
 		return

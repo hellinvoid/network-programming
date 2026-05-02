@@ -65,8 +65,8 @@ func NewTicketSystem() *TicketSystem {
 		hasTicketOnDay:      map[string]any{},
 		roadPlateSpeedProps: map[string][]*SpeedProps{},
 
-		mu:                  sync.Mutex{},
-		dispatcher:          map[Road]chan net.Conn{},
+		mu:         sync.Mutex{},
+		dispatcher: map[Road]chan net.Conn{},
 	}
 }
 
@@ -91,6 +91,7 @@ func (ts *TicketSystem) HandleConn(conn net.Conn) {
 			if err != nil {
 				return
 			}
+			ts.getDispatcher(cm.road)
 			// Let the camera handle connection
 			err = cm.HandleConn(r)
 			if err != nil {
@@ -103,7 +104,9 @@ func (ts *TicketSystem) HandleConn(conn net.Conn) {
 				return
 			}
 			for _, road := range td.roads {
-				ts.addDispatcher(road, conn)
+				log.Println("Conn: ", conn)
+				ch := ts.getDispatcher(road)
+				ch <- conn
 			}
 			err = td.HandleConn(r)
 			if err != nil {
@@ -163,15 +166,15 @@ func getCode(code uint8) string {
 	return "INVALID"
 }
 
-func (ts *TicketSystem) addDispatcher(road Road, conn net.Conn) {
+func (ts *TicketSystem) getDispatcher(road Road) chan net.Conn {
 	defer ts.mu.Unlock()
 	ts.mu.Lock()
 
 	ch, ok := ts.dispatcher[road]
-
+	// Initialize the dispatcher if not there
 	if !ok {
 		ch = make(chan net.Conn, 10)
 		ts.dispatcher[road] = ch
 	}
-	ch <- conn
+	return ch
 }

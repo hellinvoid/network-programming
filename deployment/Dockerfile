@@ -4,8 +4,10 @@ WORKDIR /app
 
 COPY . .
 
+ARG PROBLEM_PATH
+
 RUN go mod download
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o main
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o main ${PROBLEM_PATH}
 
 # Run stage
 FROM alpine:latest
