@@ -1,6 +1,10 @@
 package common
 
-import "unicode"
+import (
+	"unicode"
+
+	"github.com/google/uuid"
+)
 
 func IsAlnum(s string) bool {
     for _, r := range s {
@@ -9,4 +13,7 @@ func IsAlnum(s string) bool {
         }
     }
     return true
+}
+func GenerateUUID() string {
+    return uuid.New().String()
 }
