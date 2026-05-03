@@ -1,6 +1,7 @@
 package common
 
 import (
+	"log"
 	"sync"
 )
 
@@ -20,8 +21,9 @@ func NewCloseWrapper[T any](size int) *CloseWrapper[T] {
 func (cw *CloseWrapper[T]) Send(val T) {
 	select {
 	case cw.ch <- val:
+		log.Println("SENT")
 	case <-cw.done:
-		// session closed, drop the message
+		log.Println("DROPPED")
 	}
 }
 

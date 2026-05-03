@@ -16,7 +16,7 @@ import (
 const (
 	SESSION_EXPIRY_TIMEOUT = 60 * time.Second
 	RETRANSMISSION_TIMEOUT = 3 * time.Second
-	CHANNEL_BUFFER         = 500
+	CHANNEL_BUFFER         = 1000
 )
 
 type LRCP struct {
@@ -60,6 +60,7 @@ func (lrcp *LRCP) handleSession(session *common.CloseWrapper[*dto.Message], sess
 	defer func() {
 		log.Println("CLOSINGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG")
 		session.Close()
+		delete(lrcp.Session, sessionId)
 	}()
 
 	var lengthReceived uint64 = 0
@@ -67,6 +68,7 @@ func (lrcp *LRCP) handleSession(session *common.CloseWrapper[*dto.Message], sess
 	timer := time.NewTimer(SESSION_EXPIRY_TIMEOUT)
 
 	pr, pw := io.Pipe()
+	pwCh := startPwWriter(pw)
 
 	ack := make(chan *dto.Message, CHANNEL_BUFFER)
 	go func() {
@@ -75,13 +77,16 @@ func (lrcp *LRCP) handleSession(session *common.CloseWrapper[*dto.Message], sess
 
 		if err != nil {
 			log.Println("2222 CLOSINGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG")
-			session.Close()
 		}
+		// session.Close()
+		// delete(lrcp.Session, sessionId)
 	}()
 
 	var msg *dto.Message
-	for {
+	inputClosed := false
 
+	for {
+		log.Println("RECEVING..")
 		select {
 		case _msg := <-session.Receive():
 
@@ -95,17 +100,18 @@ func (lrcp *LRCP) handleSession(session *common.CloseWrapper[*dto.Message], sess
 			return
 		}
 
-		if msg.MsgType == "close" {
+		if !inputClosed && msg.MsgType == "close" {
 			lrcp.sendClose(msg)
-			break
+			inputClosed = true
+			pw.Close()
 		}
 
-		if msg.MsgType == "connect" {
+		if !inputClosed && msg.MsgType == "connect" {
 			lrcp.sendAck(msg, 0)
 		}
 
-		if msg.MsgType == "data" {
-			lengthReceived = lrcp.handleData(msg, lengthReceived, pw)
+		if !inputClosed && msg.MsgType == "data" {
+			lengthReceived = lrcp.handleData(msg, lengthReceived, pwCh)
 		}
 
 		// log.Println(msg.MsgType, msg.SessionId, string(msg.Buf))
@@ -130,7 +136,7 @@ func (lrcp *LRCP) sendAck(msg *dto.Message, lengthReceived uint64) {
 	lrcp.Udp.WriteToUDP([]byte(ackMsg), msg.Addr)
 }
 
-func (lrcp *LRCP) handleData(msg *dto.Message, lengthReceived uint64, pw *io.PipeWriter) uint64 {
+func (lrcp *LRCP) handleData(msg *dto.Message, lengthReceived uint64, pwCh chan string) uint64 {
 
 	str := string(msg.Buf)
 
@@ -149,11 +155,25 @@ func (lrcp *LRCP) handleData(msg *dto.Message, lengthReceived uint64, pw *io.Pip
 		return lengthReceived
 	}
 	if lengthReceived > uint64(nextPos) {
+		lrcp.sendAck(msg, lengthReceived)
 		return lengthReceived
 	}
 
 	// Remove the last '/'
 	payload = payload[:len(payload)-1]
+
+	if len(payload) > 1000 {
+		lrcp.sendAck(msg, lengthReceived)
+		return lengthReceived
+	}
+	for i := 0; i < len(payload); i++ {
+		if payload[i] == '/' {
+			// must be escaped
+			if i == 0 || payload[i-1] != '\\' {
+				return lengthReceived
+			}
+		}
+	}
 
 	payload = strings.ReplaceAll(payload, `\/`, `/`)
 	payload = strings.ReplaceAll(payload, `\\`, `\`)
@@ -161,7 +181,16 @@ func (lrcp *LRCP) handleData(msg *dto.Message, lengthReceived uint64, pw *io.Pip
 	totalLength := lengthReceived + uint64(len(payload))
 	lrcp.sendAck(msg, totalLength)
 
-	pw.Write([]byte(payload))
-
+	pwCh <- payload
 	return totalLength
+}
+
+func startPwWriter(pw *io.PipeWriter) chan string {
+	ch := make(chan string, CHANNEL_BUFFER)
+	go func(chan string) {
+		for payload := range ch {
+			pw.Write([]byte(payload))
+		}
+	}(ch)
+	return ch
 }

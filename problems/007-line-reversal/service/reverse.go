@@ -87,8 +87,8 @@ func sendReverse(payload string, udp *net.UDPConn, sessionId uint64, addr *net.U
 	dataMsg := fmt.Sprintf("/data/%d/%d/%s/", sessionId, pos, payload)
 	// log.Println("Sending ", dataMsg)
 
-	_, err := udp.WriteTo([]byte(dataMsg), addr)
-	return err
+	udp.WriteTo([]byte(dataMsg), addr)
+	return nil
 }
 
 func rev(str string) string {

@@ -40,14 +40,14 @@ func main() {
 func handleLRCP(lrcp *service.LRCP) {
 
 	// Message routing happens here
-	buf := make([]byte, MAX_BUFFER_SIZE)
+	buf := make([]byte, MAX_BUFFER_SIZE*2)
 	for {
 		n, addr, err := lrcp.Udp.ReadFromUDP(buf)
-		if err != nil {
+		if err != nil{
 			continue
 		}
 		str := string(buf[:n])
-		if str[0] != '/' && str[n-1] != '/' {
+		if len(str) <= 1 || str[0] != '/' || str[n-1] != '/' {
 			continue
 		}
 
@@ -73,6 +73,7 @@ func handleLRCP(lrcp *service.LRCP) {
 			Buf:       []byte(aft),
 		}
 
+		log.Println(string(buf[:n]))
 		lrcp.SendToSession(msg)
 	}
 
