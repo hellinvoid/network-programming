@@ -16,6 +16,7 @@ import (
 const (
 	SESSION_EXPIRY_TIMEOUT = 60 * time.Second
 	RETRANSMISSION_TIMEOUT = 3 * time.Second
+	CHANNEL_BUFFER         = 500
 )
 
 type LRCP struct {
@@ -31,7 +32,11 @@ func NewLRCP(udp *net.UDPConn) *LRCP {
 }
 
 func (lrcp *LRCP) SendToSession(msg *dto.Message) {
+	log.Println("3")
+
 	session, ok := lrcp.Session[msg.SessionId]
+	log.Println("4")
+
 	// If session does not exist then create one
 	if !ok {
 		// If first message is not connect: send /close/SESSION/ and stop.
@@ -40,33 +45,36 @@ func (lrcp *LRCP) SendToSession(msg *dto.Message) {
 			return
 		}
 		log.Println("CREATING NEW SESSION")
-		session = common.NewCloseWrapper[*dto.Message]()
+		session = common.NewCloseWrapper[*dto.Message](CHANNEL_BUFFER)
 		lrcp.Session[msg.SessionId] = session
 
 		go lrcp.handleSession(session, msg.SessionId, msg.Addr)
 	}
+	log.Println("77")
+
 	// Send to the session
 	session.Send(msg)
 }
 
 func (lrcp *LRCP) handleSession(session *common.CloseWrapper[*dto.Message], sessionId uint64, addr *net.UDPAddr) {
-	end := make(chan any)
 	defer func() {
+		log.Println("CLOSINGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG")
 		session.Close()
-		close(end)
 	}()
 
 	var lengthReceived uint64 = 0
-	var pos uint64 = 0
 
 	timer := time.NewTimer(SESSION_EXPIRY_TIMEOUT)
 
 	pr, pw := io.Pipe()
 
-	ack := make(chan *dto.Message)
+	ack := make(chan *dto.Message, CHANNEL_BUFFER)
 	go func() {
-		err := lrcp.reverse(pr, sessionId, addr, ack, end)
+		err := lrcp.reverse(pr, sessionId, addr, ack, session.Done())
+		log.Println("3333 CLOSINGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG")
+
 		if err != nil {
+			log.Println("2222 CLOSINGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG")
 			session.Close()
 		}
 	}()
@@ -75,13 +83,15 @@ func (lrcp *LRCP) handleSession(session *common.CloseWrapper[*dto.Message], sess
 	for {
 
 		select {
-		case _msg, ok := <-session.Receive():
-			if !ok {
-				return
-			}
+		case _msg := <-session.Receive():
+
+			log.Println("5")
 			msg = _msg
+			log.Println("6")
 			timer.Reset(SESSION_EXPIRY_TIMEOUT)
 		case <-timer.C:
+			return
+		case <-session.Done():
 			return
 		}
 
@@ -95,11 +105,16 @@ func (lrcp *LRCP) handleSession(session *common.CloseWrapper[*dto.Message], sess
 		}
 
 		if msg.MsgType == "data" {
-			pos, lengthReceived = lrcp.handleData(msg, pos, lengthReceived, pw)
+			lengthReceived = lrcp.handleData(msg, lengthReceived, pw)
 		}
 
+		// log.Println(msg.MsgType, msg.SessionId, string(msg.Buf))
 		if msg.MsgType == "ack" {
-			ack <- msg
+			select {
+			case ack <- msg:
+			default:
+				log.Println("DROPPED")
+			}
 		}
 
 	}
@@ -115,26 +130,26 @@ func (lrcp *LRCP) sendAck(msg *dto.Message, lengthReceived uint64) {
 	lrcp.Udp.WriteToUDP([]byte(ackMsg), msg.Addr)
 }
 
-func (lrcp *LRCP) handleData(msg *dto.Message, pos uint64, lengthReceived uint64, pw *io.PipeWriter) (uint64, uint64) {
+func (lrcp *LRCP) handleData(msg *dto.Message, lengthReceived uint64, pw *io.PipeWriter) uint64 {
 
 	str := string(msg.Buf)
 
 	nextPosStr, payload, found := strings.Cut(str, "/")
 	if !found {
-		return pos, lengthReceived
+		return lengthReceived
 	}
 
 	nextPos, err := strconv.Atoi(nextPosStr)
 	if err != nil {
-		return pos, lengthReceived
+		return lengthReceived
 	}
 
-	if pos < uint64(nextPos) {
+	if lengthReceived < uint64(nextPos) {
 		lrcp.sendAck(msg, lengthReceived)
-		return pos, lengthReceived
+		return lengthReceived
 	}
-	if pos > uint64(nextPos) {
-		return pos, lengthReceived
+	if lengthReceived > uint64(nextPos) {
+		return lengthReceived
 	}
 
 	// Remove the last '/'
@@ -146,9 +161,7 @@ func (lrcp *LRCP) handleData(msg *dto.Message, pos uint64, lengthReceived uint64
 	totalLength := lengthReceived + uint64(len(payload))
 	lrcp.sendAck(msg, totalLength)
 
-	fmt.Fprint(pw, pos)
-	fmt.Fprint(pw, "/")
-	fmt.Fprint(pw, payload)
+	pw.Write([]byte(payload))
 
-	return uint64(nextPos) + 1, totalLength
+	return totalLength
 }

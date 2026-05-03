@@ -5,25 +5,24 @@ import (
 )
 
 type CloseWrapper[T any] struct {
-	ch       chan T
-	mu       sync.Mutex
-	isClosed bool
+	ch   chan T
+	done chan any
+	once sync.Once
 }
 
-func NewCloseWrapper[T any]() *CloseWrapper[T] {
+func NewCloseWrapper[T any](size int) *CloseWrapper[T] {
 	return &CloseWrapper[T]{
-		ch:       make(chan T),
-		mu:       sync.Mutex{},
-		isClosed: false,
+		ch:   make(chan T, size),
+		done: make(chan any),
 	}
 }
 
 func (cw *CloseWrapper[T]) Send(val T) {
-	cw.mu.Lock()
-	if !cw.isClosed {
-		cw.ch <- val
+	select {
+	case cw.ch <- val:
+	case <-cw.done:
+		// session closed, drop the message
 	}
-	cw.mu.Unlock()
 }
 
 func (cw *CloseWrapper[T]) Receive() <-chan T {
@@ -31,8 +30,11 @@ func (cw *CloseWrapper[T]) Receive() <-chan T {
 }
 
 func (cw *CloseWrapper[T]) Close() {
-	cw.mu.Lock()
-	close(cw.ch)
-	cw.isClosed = true
-	cw.mu.Unlock()
+	cw.once.Do(func() {
+		close(cw.done)
+	})
+}
+
+func (cw *CloseWrapper[T]) Done() <-chan any {
+	return cw.done
 }

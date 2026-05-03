@@ -47,7 +47,6 @@ func handleLRCP(lrcp *service.LRCP) {
 			continue
 		}
 		str := string(buf[:n])
-		log.Printf("From : %s\n Msg: %s", addr.String(), str)
 		if str[0] != '/' && str[n-1] != '/' {
 			continue
 		}
