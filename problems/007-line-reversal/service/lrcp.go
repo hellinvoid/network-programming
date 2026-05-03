@@ -145,7 +145,10 @@ func (lrcp *LRCP) handleData(msg *dto.Message, pos uint64, lengthReceived uint64
 
 	totalLength := lengthReceived + uint64(len(payload))
 	lrcp.sendAck(msg, totalLength)
-	pw.Write([]byte(payload))
+
+	fmt.Fprint(pw, pos)
+	fmt.Fprint(pw, "/")
+	fmt.Fprint(pw, payload)
 
 	return uint64(nextPos) + 1, totalLength
 }
