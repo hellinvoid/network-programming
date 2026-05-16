@@ -1,0 +1,6 @@
+{"request":"put","queue":"queue1","job":{"title":"example-job"},"pri":123}
+{"request":"get","queues":["queue1"]}
+{"request":"abort","id":1}
+{"request":"get","queues":["queue1"]}
+{"request":"delete","id":1}
+{"request":"get","queues":["queue1"]}
